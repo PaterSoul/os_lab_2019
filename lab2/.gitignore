@@ -1,0 +1,11 @@
+*.o
+*.a
+*.so
+swap_program
+revert_program
+revert_static
+revert_dynamic
+tests_program
+hello_world
+.DS_Store
+Thumbs.db
