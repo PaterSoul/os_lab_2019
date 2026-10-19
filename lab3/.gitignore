@@ -1,0 +1,11 @@
+*.o
+*_program
+*_min_max
+exec_program
+sequential_min_max
+parallel_min_max
+process1_result.txt
+process2_result.txt
+*.save
+*.swp
+*~

@@ -1,17 +1,42 @@
-CC=gcc
-CFLAGS=-I.
+# Компилятор
+CC = gcc
 
-sequential_min_max : utils.o find_min_max.o utils.h find_min_max.h
-	$(CC) -o sequential_min_max find_min_max.o utils.o sequential_min_max.c $(CFLAGS)
+# Флаги компиляции
+CFLAGS = -Wall -Wextra -g
 
-parallel_min_max : utils.o find_min_max.o utils.h find_min_max.h
-	$(CC) -o parallel_min_max utils.o find_min_max.o parallel_min_max.c $(CFLAGS)
+# Исходные файлы
+SEQUENTIAL_SRC = sequential_min_max.c find_min_max.c utils.c
+PARALLEL_SRC = parallel_min_max.c find_min_max.c utils.c
 
-utils.o : utils.h
-	$(CC) -o utils.o -c utils.c $(CFLAGS)
+# Целевые файлы
+SEQUENTIAL_BIN = sequential_min_max
+PARALLEL_BIN = parallel_min_max
 
-find_min_max.o : utils.h find_min_max.h
-	$(CC) -o find_min_max.o -c find_min_max.c $(CFLAGS)
+# Target по умолчанию - собирает все программы
+all: $(SEQUENTIAL_BIN) $(PARALLEL_BIN)
 
-clean :
-	rm utils.o find_min_max.o sequential_min_max parallel_min_max
+# Сборка последовательной версии
+$(SEQUENTIAL_BIN): $(SEQUENTIAL_SRC)
+	$(CC) $(CFLAGS) $(SEQUENTIAL_SRC) -o $(SEQUENTIAL_BIN)
+
+# Сборка параллельной версии
+$(PARALLEL_BIN): $(PARALLEL_SRC)
+	$(CC) $(CFLAGS) $(PARALLEL_SRC) -o $(PARALLEL_BIN)
+
+# Очистка
+clean:
+	rm -f $(SEQUENTIAL_BIN) $(PARALLEL_BIN)
+	rm -f *.o
+	rm -f process1_result.txt process2_result.txt
+
+# Пересборка
+rebuild: clean all
+
+# Запуск тестов
+test: $(SEQUENTIAL_BIN) $(PARALLEL_BIN)
+	./$(SEQUENTIAL_BIN) 42 10
+	./$(PARALLEL_BIN) 42 10 by_files
+	./$(PARALLEL_BIN) 42 10
+
+.PHONY: all clean rebuild test
+

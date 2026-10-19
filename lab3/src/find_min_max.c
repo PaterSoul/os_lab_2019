@@ -1,12 +1,29 @@
 #include "find_min_max.h"
-
-#include <limits.h>
+#include <stddef.h>
 
 struct MinMax GetMinMax(int *array, unsigned int begin, unsigned int end) {
-  struct MinMax min_max;
-  min_max.min = INT_MAX;
-  min_max.max = INT_MIN;
-
-  // your code here
-  return min_max;
+    struct MinMax result;
+    result.min = 0;
+    result.max = 0;
+    
+    // Проверка на корректность
+    if (array == NULL || begin > end) {
+        return result;
+    }
+    
+    // Инициализация первым элементом
+    result.min = array[begin];
+    result.max = array[begin];
+    
+    // Поиск мин и макс
+    for (unsigned int i = begin + 1; i <= end; i++) {
+        if (array[i] < result.min) {
+            result.min = array[i];
+        }
+        if (array[i] > result.max) {
+            result.max = array[i];
+        }
+    }
+    
+    return result;
 }

@@ -1,155 +1,106 @@
-#include <ctype.h>
-#include <limits.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-
-#include <sys/time.h>
-#include <sys/types.h>
 #include <sys/wait.h>
-
-#include <getopt.h>
-
+#include <string.h>
 #include "find_min_max.h"
 #include "utils.h"
 
-int main(int argc, char **argv) {
-  int seed = -1;
-  int array_size = -1;
-  int pnum = -1;
-  bool with_files = false;
-
-  while (true) {
-    int current_optind = optind ? optind : 1;
-
-    static struct option options[] = {{"seed", required_argument, 0, 0},
-                                      {"array_size", required_argument, 0, 0},
-                                      {"pnum", required_argument, 0, 0},
-                                      {"by_files", no_argument, 0, 'f'},
-                                      {0, 0, 0, 0}};
-
-    int option_index = 0;
-    int c = getopt_long(argc, argv, "f", options, &option_index);
-
-    if (c == -1) break;
-
-    switch (c) {
-      case 0:
-        switch (option_index) {
-          case 0:
-            seed = atoi(optarg);
-            // your code here
-            // error handling
-            break;
-          case 1:
-            array_size = atoi(optarg);
-            // your code here
-            // error handling
-            break;
-          case 2:
-            pnum = atoi(optarg);
-            // your code here
-            // error handling
-            break;
-          case 3:
-            with_files = true;
-            break;
-
-          defalut:
-            printf("Index %d is out of options\n", option_index);
-        }
-        break;
-      case 'f':
-        with_files = true;
-        break;
-
-      case '?':
-        break;
-
-      default:
-        printf("getopt returned character code 0%o?\n", c);
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        printf("Usage: %s seed arraysize [by_files]\n", argv[0]);
+        return 1;
     }
-  }
 
-  if (optind < argc) {
-    printf("Has at least one no option argument\n");
-    return 1;
-  }
+    int seed = atoi(argv[1]);
+    int array_size = atoi(argv[2]);
+    int use_files = (argc > 3 && strcmp(argv[3], "by_files") == 0);
 
-  if (seed == -1 || array_size == -1 || pnum == -1) {
-    printf("Usage: %s --seed \"num\" --array_size \"num\" --pnum \"num\" \n",
-           argv[0]);
-    return 1;
-  }
+    // Генерируем массив
+    int *array = malloc(array_size * sizeof(int));
+    GenerateArray(array, array_size, seed);
 
-  int *array = malloc(sizeof(int) * array_size);
-  GenerateArray(array, array_size, seed);
-  int active_child_processes = 0;
+    printf("Array size: %d, seed: %d\n", array_size, seed);
 
-  struct timeval start_time;
-  gettimeofday(&start_time, NULL);
+    int pipefd[2];
+    if (!use_files) {
+        pipe(pipefd);
+    }
 
-  for (int i = 0; i < pnum; i++) {
-    pid_t child_pid = fork();
-    if (child_pid >= 0) {
-      // successful fork
-      active_child_processes += 1;
-      if (child_pid == 0) {
-        // child process
+    // Первый дочерний процесс - первая половина массива
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        struct MinMax result = GetMinMax(array, 0, array_size / 2 - 1);
 
-        // parallel somehow
-
-        if (with_files) {
-          // use files here
+        if (use_files) {
+            FILE *f = fopen("process1_result.txt", "w");
+            fprintf(f, "%d %d", result.min, result.max);
+            fclose(f);
         } else {
-          // use pipe here
+            write(pipefd[1], &result.min, sizeof(int));
+            write(pipefd[1], &result.max, sizeof(int));
         }
-        return 0;
-      }
-
-    } else {
-      printf("Fork failed!\n");
-      return 1;
-    }
-  }
-
-  while (active_child_processes > 0) {
-    // your code here
-
-    active_child_processes -= 1;
-  }
-
-  struct MinMax min_max;
-  min_max.min = INT_MAX;
-  min_max.max = INT_MIN;
-
-  for (int i = 0; i < pnum; i++) {
-    int min = INT_MAX;
-    int max = INT_MIN;
-
-    if (with_files) {
-      // read from files
-    } else {
-      // read from pipes
+        exit(0);
     }
 
-    if (min < min_max.min) min_max.min = min;
-    if (max > min_max.max) min_max.max = max;
-  }
+    // Второй дочерний процесс - вторая половина массива
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        struct MinMax result = GetMinMax(array, array_size / 2, array_size - 1);
 
-  struct timeval finish_time;
-  gettimeofday(&finish_time, NULL);
+        if (use_files) {
+            FILE *f = fopen("process2_result.txt", "w");
+            fprintf(f, "%d %d", result.min, result.max);
+            fclose(f);
+        } else {
+            write(pipefd[1], &result.min, sizeof(int));
+            write(pipefd[1], &result.max, sizeof(int));
+        }
+        exit(0);
+    }
 
-  double elapsed_time = (finish_time.tv_sec - start_time.tv_sec) * 1000.0;
-  elapsed_time += (finish_time.tv_usec - start_time.tv_usec) / 1000.0;
+    // Родительский процесс
+    if (!use_files) {
+        close(pipefd[1]);
+    }
 
-  free(array);
+    wait(NULL);
+    wait(NULL);
 
-  printf("Min: %d\n", min_max.min);
-  printf("Max: %d\n", min_max.max);
-  printf("Elapsed time: %fms\n", elapsed_time);
-  fflush(NULL);
-  return 0;
+    int global_min, global_max;
+
+    if (use_files) {
+        FILE *f1 = fopen("process1_result.txt", "r");
+        FILE *f2 = fopen("process2_result.txt", "r");
+
+        int min1, max1, min2, max2;
+        fscanf(f1, "%d %d", &min1, &max1);
+        fscanf(f2, "%d %d", &min2, &max2);
+
+        fclose(f1);
+        fclose(f2);
+
+        global_min = (min1 < min2) ? min1 : min2;
+        global_max = (max1 > max2) ? max1 : max2;
+
+        remove("process1_result.txt");
+        remove("process2_result.txt");
+    } else {
+        int min1, max1, min2, max2;
+        read(pipefd[0], &min1, sizeof(int));
+        read(pipefd[0], &max1, sizeof(int));
+        read(pipefd[0], &min2, sizeof(int));
+        read(pipefd[0], &max2, sizeof(int));
+
+        global_min = (min1 < min2) ? min1 : min2;
+        global_max = (max1 > max2) ? max1 : max2;
+
+        close(pipefd[0]);
+    }
+
+    printf("Global Min: %d\n", global_min);
+    printf("Global Max: %d\n", global_max);
+
+    free(array);
+    return 0;
 }
