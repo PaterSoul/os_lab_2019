@@ -2,3 +2,7 @@ lab4/src/parallel_min_max
 lab4/src/zombie_demo
 lab4/src/process_memory
 lab4/src/parallel_sum
+lab5/src/mutex_race
+lab5/src/mutex_safe
+lab5/src/factorial
+lab5/src/deadlock_demo
